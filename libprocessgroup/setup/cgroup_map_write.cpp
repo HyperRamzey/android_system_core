@@ -291,8 +291,14 @@ bool CgroupSetup() {
         }
 
         if (!SetupCgroup(descriptor)) {
-            LOG(ERROR) << "Failed to setup " << name << " cgroup";
-            return false;
+            // Old vendor kernels may lack individual controllers or reject
+            // specific mount options. Failing the whole CgroupSetup() here
+            // prevents creation of /sys/fs/cgroup/{apps,system}, which makes
+            // createProcessGroup() fail with ENOENT for every service - fatal
+            // for apexd-bootstrap (bootstrap-apexd-failed reboot loop on
+            // a30s). Warn and continue with the remaining controllers.
+            // (Adapted from trebledroid old-kernel support for Android 16.)
+            LOG(WARNING) << "Failed to setup " << name << " cgroup (continuing)";
         }
     }
 
