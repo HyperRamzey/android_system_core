@@ -176,6 +176,30 @@ static const struct fs_path_config android_files[] = {
     { 06755, AID_ROOT,      AID_ROOT,      0, "system/xbin/procmem" },
     { 04750, AID_ROOT,      AID_SHELL,     0, "system/xbin/su" },
 
+    // KernelSU manager payloads that are EXECUTED, not loaded.
+    //
+    // The manager ships as a preinstalled app, so its nativeLibraryDir is
+    // /system/app/KernelSU/lib/arm64 and it runs ksud from there
+    // (<nativeLibraryDir>/libksud.so) instead of loading it with dlopen, and
+    // passes libmagiskboot.so to `ksud install`, which copies it to
+    // /data/adb/ksu/bin and executes it. Everything else in that directory is
+    // dlopen()ed and must stay 0644.
+    //
+    // Without these entries the generic "system/app/*" rule below wins: its
+    // fnmatch has no FNM_PATHNAME, so the trailing '*' also swallows the
+    // "KernelSU/lib/arm64/libksud.so" part and forces 0644. The manager then
+    // cannot bootstrap root at all:
+    //
+    //   W KsuCli: Caused by: java.io.IOException:
+    //       Cannot run program "/system/app/KernelSU/lib/arm64/libksud.so":
+    //       error=13, Permission denied
+    //
+    // This table, not the source file mode, is what decides the mode in the
+    // image: mkfs.erofs is built WITH_ANDROID and calls fs_config(), which
+    // consults this list. A chmod on the staged file changes nothing.
+    { 00755, AID_ROOT,      AID_ROOT,      0, "system/app/KernelSU/lib/arm64/libksud.so" },
+    { 00755, AID_ROOT,      AID_ROOT,      0, "system/app/KernelSU/lib/arm64/libmagiskboot.so" },
+
     // the following files have enhanced capabilities and ARE included
     // in user builds.
     { 00700, AID_SYSTEM,    AID_SHELL,     CAP_MASK_LONG(CAP_BLOCK_SUSPEND),
